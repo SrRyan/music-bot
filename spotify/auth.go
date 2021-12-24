@@ -1,12 +1,15 @@
 package spotify
 
 import (
+	"context"
+	"net/http"
+
 	"golang.org/x/oauth2"
 )
 
 const (
-	AuthURL string = "https://accounts.spotify.com/authorize"
-	TokenUR string = "https://accounts.spotify.com/api/token"
+	AuthURL  string = "https://accounts.spotify.com/authorize"
+	TokenURL string = "https://accounts.spotify.com/api/token"
 )
 
 // Scopes is a set of scopes that can be used when requesting a new token.
@@ -78,7 +81,7 @@ type Auth struct {
 	Config *oauth2.Config
 }
 
-// New
+// NewAuth returns a new Auth struct
 func NewAuth(opts AuthOptions) *Auth {
 	cfg := &oauth2.Config{
 		ClientID:     opts.ClientID,
@@ -87,7 +90,7 @@ func NewAuth(opts AuthOptions) *Auth {
 		Scopes:       opts.Scopes,
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  AuthURL,
-			TokenURL: TokenUR,
+			TokenURL: TokenURL,
 		},
 	}
 
@@ -95,4 +98,21 @@ func NewAuth(opts AuthOptions) *Auth {
 		Config: cfg,
 	}
 
+}
+
+// GetCode returns the code from the URL
+func (a *Auth) GetCode(r *http.Request) string {
+	// TODO Handle Error if URL contains error or other then expected
+	return r.URL.Query().Get("code")
+}
+
+// AuthURL returns the URL used for obtaining an access token.
+func (a *Auth) GetAuthURL(state string) string {
+	return a.Config.AuthCodeURL(state)
+}
+
+// Exchange converts an authorization code into a token.
+func (a *Auth) ExchangeForToken(code string) (*oauth2.Token, error) {
+	// TODO probably handle some checks prior to this
+	return a.Config.Exchange(context.Background(), code)
 }
