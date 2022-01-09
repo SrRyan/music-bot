@@ -2,6 +2,7 @@ package spotify
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"golang.org/x/oauth2"
@@ -77,12 +78,12 @@ type AuthOptions struct {
 	Scopes       []string
 }
 
-type Auth struct {
+type Authentication struct {
 	Config *oauth2.Config
 }
 
 // NewAuth returns a new Auth struct
-func NewAuth(opts AuthOptions) *Auth {
+func NewAuth(opts AuthOptions) *Authentication {
 	cfg := &oauth2.Config{
 		ClientID:     opts.ClientID,
 		ClientSecret: opts.ClientSecret,
@@ -94,25 +95,44 @@ func NewAuth(opts AuthOptions) *Auth {
 		},
 	}
 
-	return &Auth{
+	return &Authentication{
 		Config: cfg,
 	}
 
 }
 
 // GetCode returns the code from the URL
-func (a *Auth) GetCode(r *http.Request) string {
+func (a *Authentication) GetCode(r *http.Request) string {
 	// TODO Handle Error if URL contains error or other then expected
 	return r.URL.Query().Get("code")
 }
 
 // AuthURL returns the URL used for obtaining an access token.
-func (a *Auth) GetAuthURL(state string) string {
+func (a *Authentication) GetAuthURL(state string) string {
 	return a.Config.AuthCodeURL(state)
 }
 
 // Exchange converts an authorization code into a token.
-func (a *Auth) ExchangeForToken(code string) (*oauth2.Token, error) {
-	// TODO probably handle some checks prior to this
-	return a.Config.Exchange(context.Background(), code)
+func (a *Authentication) ExchangeCodeForToken(ctx context.Context, req *http.Request, opts ...oauth2.AuthCodeOption) (*oauth2.Token, error) {
+
+	state := req.URL.Query().Get("state")
+	if state == "" {
+		return nil, errors.New("state mismatch")
+	}
+
+	// TODO Handle Error if URL contains error or other then expected
+	code := req.URL.Query().Get("code")
+	if code == "" {
+		return nil, errors.New("missing code")
+	}
+
+	return a.Config.Exchange(ctx, code, opts...)
+
+}
+
+// HttpClient returns an http.Client that uses the provided token.
+// The token will automatically be refreshed as necessary.
+// The returned client and its Transport should not be modified.
+func (a *Authentication) HttpClient(ctx context.Context, token *oauth2.Token) *http.Client {
+	return a.Config.Client(ctx, token)
 }
